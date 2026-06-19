@@ -1,58 +1,391 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Laravel REST API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+JSON-only REST API built with Laravel 13, PHP 8.3, SQLite, and Laravel Sanctum.
+It provides user registration, login, logout, authenticated user listing, profile
+lookup, and password changes. There are no web pages: visiting `/` returns a JSON
+`404 Not Found` response.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- JSON responses for successful requests and errors
+- Sanctum bearer-token authentication
+- User registration and login
+- Protected user list and current-user profile
+- Password change with current-password verification
+- Logout and token revocation
+- SQLite database by default
+- Docker development environment on `http://localhost:9001`
+- Automated feature tests
+- VS Code REST Client request collection
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requirements
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Choose one development setup:
 
-## Learning Laravel
+- Docker Engine with Docker Compose, or
+- PHP 8.3 with Composer and the required PHP extensions
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+The local PHP extensions used by this project include:
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```text
+bcmath, curl, fileinfo, gd, intl, mbstring, mysqli, openssl,
+pdo_sqlite, redis, sqlite3, xml, zip
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Node.js is not required to run this API.
 
-## Contributing
+## Project Layout
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```text
+dockerfiles/
+├── Dockerfile
+├── docker-compose.yml
+├── data/
+│   └── mybackend/       # Laravel application
+└── restclient/
+    └── api-test.http    # VS Code REST Client requests
+```
 
-## Code of Conduct
+## Docker Setup
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Run these commands from the repository root, the directory containing
+`docker-compose.yml`.
 
-## Security Vulnerabilities
+### 1. Build the image
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+docker compose build
+```
+
+### 2. Install PHP dependencies
+
+```bash
+docker compose run --rm -w /data/mybackend ubuntu composer install
+```
+
+### 3. Create the environment file
+
+Skip this command if `data/mybackend/.env` already exists.
+
+```bash
+docker compose run --rm -w /data/mybackend ubuntu sh -c "cp .env.example .env"
+```
+
+### 4. Generate the application key
+
+```bash
+docker compose run --rm -w /data/mybackend ubuntu php artisan key:generate
+```
+
+### 5. Create the SQLite file
+
+```bash
+docker compose run --rm -w /data/mybackend ubuntu php -r "file_exists('database/database.sqlite') || touch('database/database.sqlite');"
+```
+
+### 6. Run the database migrations
+
+```bash
+docker compose run --rm -w /data/mybackend ubuntu php artisan migrate
+```
+
+### 7. Start the API
+
+```bash
+docker compose up -d
+```
+
+The API is now available at:
+
+```text
+http://localhost:9001
+```
+
+Useful Docker commands:
+
+```bash
+# View application output
+docker compose logs -f ubuntu
+
+# Open a shell in the running container
+docker compose exec ubuntu bash
+
+# Stop and remove the container
+docker compose down
+
+# Rebuild after changing the Dockerfile
+docker compose up -d --build
+```
+
+The local `data/` directory is mounted at `/data` inside the container. Changes
+made to the Laravel source code are immediately visible inside the container.
+
+## Local Linux Setup
+
+The following package command is for Ubuntu 24.04, which provides PHP 8.3 in its
+official repositories.
+
+### 1. Install PHP, extensions, and tools
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  php8.3-cli php8.3-bcmath php8.3-curl php8.3-gd php8.3-intl \
+  php8.3-mbstring php8.3-mysql php8.3-redis php8.3-sqlite3 \
+  php8.3-xml php8.3-zip curl unzip
+```
+
+Install Composer if it is not already available, then verify the installation:
+
+```bash
+php --version
+composer --version
+```
+
+### 2. Configure the Laravel project
+
+From the repository root:
+
+```bash
+cd data/mybackend
+composer install
+cp .env.example .env
+php artisan key:generate
+touch database/database.sqlite
+php artisan migrate
+```
+
+If `.env` or `database/database.sqlite` already exists, do not overwrite it.
+
+### 3. Start the local server
+
+```bash
+php artisan serve --host=127.0.0.1 --port=9001
+```
+
+Open `http://localhost:9001` to confirm that the API returns a JSON 404 response.
+
+## Local Windows Setup
+
+### 1. Install the required software
+
+Install these applications for Windows:
+
+- PHP 8.3 (64-bit is recommended)
+- Composer 2
+- Git, if the project will be cloned from a Git repository
+
+Add the PHP directory to the Windows `PATH`. In `php.ini`, enable the extensions
+required by the project, especially:
+
+```ini
+extension=curl
+extension=fileinfo
+extension=gd
+extension=intl
+extension=mbstring
+extension=mysqli
+extension=openssl
+extension=pdo_sqlite
+extension=sqlite3
+extension=zip
+```
+
+Confirm that PHP and Composer are available in PowerShell:
+
+```powershell
+php --version
+composer --version
+php -m
+```
+
+### 2. Configure the Laravel project
+
+From the repository root in PowerShell:
+
+```powershell
+Set-Location data\mybackend
+composer install
+Copy-Item .env.example .env
+php artisan key:generate
+
+if (-not (Test-Path database\database.sqlite)) {
+    New-Item -ItemType File database\database.sqlite
+}
+
+php artisan migrate
+```
+
+Skip `Copy-Item` when an existing `.env` contains settings that must be retained.
+
+### 3. Start the local server
+
+```powershell
+php artisan serve --host=127.0.0.1 --port=9001
+```
+
+The API is now available at `http://localhost:9001`.
+
+## API Authentication
+
+Registration and login return a Sanctum token. Send that token on every protected
+request:
+
+```http
+Authorization: Bearer YOUR_TOKEN
+Accept: application/json
+```
+
+Do not place tokens in a URL or commit real tokens to source control.
+
+## API Endpoints
+
+| Method | Endpoint | Authentication | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/register` | Public | Register a user and return a token |
+| `POST` | `/api/login` | Public | Log in and return a token |
+| `GET` | `/api/users` | Bearer token | List all users |
+| `GET` | `/api/me` | Bearer token | Return the authenticated user |
+| `PUT` | `/api/change-password` | Bearer token | Change the authenticated user's password |
+| `POST` | `/api/logout` | Bearer token | Revoke the current token |
+
+### Register
+
+```http
+POST /api/register
+Content-Type: application/json
+Accept: application/json
+```
+
+```json
+{
+  "name": "Juan Dela Cruz",
+  "email": "juan@example.com",
+  "password": "password123",
+  "password_confirmation": "password123"
+}
+```
+
+A successful registration returns HTTP `201` with the user and token.
+
+### Login
+
+```json
+{
+  "email": "juan@example.com",
+  "password": "password123"
+}
+```
+
+Invalid credentials return HTTP `401`. Successful login returns a token that can
+be used for protected endpoints.
+
+### Change Password
+
+```json
+{
+  "current_password": "password123",
+  "new_password": "new-password123",
+  "new_password_confirmation": "new-password123"
+}
+```
+
+The new password must contain at least eight characters, must match its
+confirmation, and must differ from the current password. Validation failures
+return HTTP `422`.
+
+### Common Status Codes
+
+| Status | Meaning |
+| --- | --- |
+| `200` | Request completed successfully |
+| `201` | User registered successfully |
+| `401` | Missing, invalid, or revoked token; or invalid login |
+| `404` | Route not found |
+| `422` | Request validation failed |
+
+## Testing with VS Code REST Client
+
+1. Install the **REST Client** extension in Visual Studio Code.
+2. Open `restclient/api-test.http` from the repository root.
+3. Start the API on port `9001`.
+4. Run **Register** first, followed by **Login**.
+5. Run the protected requests. Their bearer tokens are read automatically from
+   the named login response.
+6. Run **Change password** before **Login using the new password**.
+
+The collection also includes requests that verify root `404`, unauthorized
+access, and an unknown API route.
+
+## Automated Tests
+
+Using Docker, run this command from the repository root:
+
+```bash
+docker compose run --rm -w /data/mybackend ubuntu php artisan test
+```
+
+For a local PHP installation, run this command inside `data/mybackend`:
+
+```bash
+php artisan test
+```
+
+Check the registered routes with:
+
+```bash
+php artisan route:list
+```
+
+## Configuration and Security
+
+- Keep `APP_DEBUG=false` when responses may be seen by other users. This prevents
+  stack traces and internal file paths from appearing in JSON errors.
+- Never commit `.env`, application keys, database credentials, or API tokens.
+- Change `APP_URL` to the correct URL for each environment.
+- Run `php artisan config:clear` after changing `.env` during development.
+- Use HTTPS outside local development.
+- The built-in `artisan serve` command is for development only. Use a production
+  web server and process manager when deploying the API.
+
+## Troubleshooting
+
+### `could not find driver` for SQLite
+
+Enable or install `pdo_sqlite` and `sqlite3`, then restart the PHP process.
+
+### `No application encryption key has been specified`
+
+```bash
+php artisan key:generate
+```
+
+### Database table does not exist
+
+```bash
+php artisan migrate
+```
+
+### Port 9001 is already in use
+
+Stop the other process or change both the Docker port mapping and Laravel server
+port. For local PHP, choose another port with `--port=9002`.
+
+### API returns old configuration values
+
+```bash
+php artisan optimize:clear
+```
+
+### Docker container exits immediately
+
+View the startup error:
+
+```bash
+docker compose logs ubuntu
+```
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project uses the Laravel framework, which is open-sourced software licensed
+under the MIT license.
