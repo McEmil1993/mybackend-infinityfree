@@ -361,16 +361,14 @@ The workflow at `.github/workflows/prod-deploy.yml` runs only when a commit is
 pushed to the `prod` branch. Merging a pull request into `prod` creates a push,
 so it also starts the workflow. Pushes and merges to `main` do not deploy.
 
-The pipeline performs these steps in order:
+The deployment performs these steps in order:
 
 1. Install PHP 8.3 and Composer dependencies.
-2. Run Laravel Pint and the automated tests.
-3. Stop immediately if CI fails.
-4. Install optimized production dependencies without development packages.
-5. Move the contents of Laravel's `public/` directory to the shared-hosting root
+2. Install optimized production dependencies without development packages.
+3. Move the contents of Laravel's `public/` directory to the shared-hosting root
    and install an adjusted `index.php` front controller.
-6. Create the production `.env` from a protected GitHub Secret.
-7. Upload the application only to `mybackend.free.nf/htdocs/` over FTP.
+4. Create the production `.env` from a protected GitHub Secret.
+5. Upload the application only to `mybackend.free.nf/htdocs/` over FTP.
 
 The deployment excludes tests, Git metadata, GitHub workflow files, local logs,
 and development dependencies. The FTP action is restricted to the exact

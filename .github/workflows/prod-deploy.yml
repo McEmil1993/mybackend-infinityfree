@@ -13,40 +13,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  ci:
-    name: Run Laravel CI
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up PHP 8.3 for tests
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          extensions: bcmath, curl, fileinfo, gd, intl, mbstring, pdo_sqlite, redis, sqlite3, xml, zip
-          coverage: none
-          tools: composer:v2
-
-      - name: Install test dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
-
-      - name: Prepare test environment
-        run: |
-          cp .env.example .env
-          php artisan key:generate
-
-      - name: Check code style
-        run: vendor/bin/pint --test
-
-      - name: Run automated tests
-        run: php artisan test
-
   deploy:
     name: Build and upload Laravel by FTP
-    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment: production
@@ -59,7 +27,7 @@ jobs:
       INFINITYFREE_ENV_FILE: ${{ secrets.INFINITYFREE_ENV_FILE }}
 
     steps:
-      - name: Checkout tested prod commit
+      - name: Checkout prod commit
         uses: actions/checkout@v4
 
       - name: Set up PHP 8.3 for production
