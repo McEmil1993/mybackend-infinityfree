@@ -20,7 +20,7 @@ class ApiAuthenticationTest extends TestCase
 
     public function test_a_user_can_register_and_receive_a_token(): void
     {
-        $response = $this->postJson('/api/register', [
+        $response = $this->postJson('/register', [
             'name' => 'Juan Dela Cruz',
             'email' => 'juan@example.com',
             'password' => 'password123',
@@ -42,7 +42,7 @@ class ApiAuthenticationTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => 'juan@example.com',
             'password' => 'password123',
         ])->assertOk()->assertJsonStructure(['message', 'user', 'token']);
@@ -52,7 +52,7 @@ class ApiAuthenticationTest extends TestCase
     {
         User::factory()->create(['email' => 'juan@example.com']);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => 'juan@example.com',
             'password' => 'wrong-password',
         ])->assertUnauthorized()->assertJsonPath('message', 'Invalid email or password.');
@@ -60,9 +60,9 @@ class ApiAuthenticationTest extends TestCase
 
     public function test_protected_endpoints_require_a_token(): void
     {
-        $this->getJson('/api/users')->assertUnauthorized();
-        $this->getJson('/api/me')->assertUnauthorized();
-        $this->putJson('/api/change-password')->assertUnauthorized();
+        $this->getJson('/users')->assertUnauthorized();
+        $this->getJson('/me')->assertUnauthorized();
+        $this->putJson('/change-password')->assertUnauthorized();
     }
 
     public function test_an_authenticated_user_can_view_users_and_their_profile(): void
@@ -71,11 +71,11 @@ class ApiAuthenticationTest extends TestCase
         User::factory()->count(2)->create();
         $token = $user->createToken('test-token')->plainTextToken;
 
-        $this->withToken($token)->getJson('/api/users')
+        $this->withToken($token)->getJson('/users')
             ->assertOk()
             ->assertJsonCount(3, 'users');
 
-        $this->withToken($token)->getJson('/api/me')
+        $this->withToken($token)->getJson('/me')
             ->assertOk()
             ->assertJsonPath('user.id', $user->id)
             ->assertJsonMissingPath('user.password');
@@ -86,7 +86,7 @@ class ApiAuthenticationTest extends TestCase
         $user = User::factory()->create(['password' => 'old-password']);
         $token = $user->createToken('test-token')->plainTextToken;
 
-        $this->withToken($token)->putJson('/api/change-password', [
+        $this->withToken($token)->putJson('/change-password', [
             'current_password' => 'old-password',
             'new_password' => 'new-password123',
             'new_password_confirmation' => 'new-password123',
@@ -100,7 +100,7 @@ class ApiAuthenticationTest extends TestCase
         $user = User::factory()->create(['password' => 'old-password']);
         $token = $user->createToken('test-token')->plainTextToken;
 
-        $this->withToken($token)->putJson('/api/change-password', [
+        $this->withToken($token)->putJson('/change-password', [
             'current_password' => 'incorrect-password',
             'new_password' => 'new-password123',
             'new_password_confirmation' => 'new-password123',
