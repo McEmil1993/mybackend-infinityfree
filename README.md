@@ -367,11 +367,14 @@ The pipeline performs these steps in order:
 2. Run Laravel Pint and the automated tests.
 3. Stop immediately if CI fails.
 4. Install optimized production dependencies without development packages.
-5. Upload the application only to `mybackend.free.nf/htdocs/` over FTP.
+5. Move the contents of Laravel's `public/` directory to the shared-hosting root
+   and install an adjusted `index.php` front controller.
+6. Create the production `.env` from a protected GitHub Secret.
+7. Upload the application only to `mybackend.free.nf/htdocs/` over FTP.
 
-The FTP sync does not delete remote files. It also excludes `.env`, tests, Git
-metadata, GitHub workflow files, and local logs. Create and maintain the
-production `.env` directly on the server; the workflow will not overwrite it.
+The deployment excludes tests, Git metadata, GitHub workflow files, local logs,
+and development dependencies. The FTP action is restricted to the exact
+`mybackend.free.nf/htdocs/` directory and does not use a clean-slate deletion.
 
 ### Required GitHub Secrets
 
@@ -383,6 +386,7 @@ create these repository or `production` environment secrets:
 | `FTP_HOST` | FTP server hostname |
 | `FTP_USERNAME` | FTP account username |
 | `FTP_PASSWORD` | FTP account password |
+| `INFINITYFREE_ENV_FILE` | Complete multiline production `.env` contents |
 
 Do not place FTP credentials in the workflow, `.env.example`, or repository.
 Because FTP is unencrypted, use FTPS or SFTP instead when the hosting provider

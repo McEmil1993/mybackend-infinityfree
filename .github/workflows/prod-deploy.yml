@@ -1,4 +1,4 @@
-name: Production CI/CD
+name: Deploy to InfinityFree
 
 on:
   push:
@@ -9,37 +9,29 @@ permissions:
   contents: read
 
 concurrency:
-  group: production-deploy
+  group: infinityfree-production
   cancel-in-progress: false
 
 jobs:
   ci:
-    name: Test application
-    runs-on: ubuntu-24.04
+    name: Run Laravel CI
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      - name: Check out prod commit
-        uses: actions/checkout@v6
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set up PHP 8.3
+      - name: Set up PHP 8.3 for tests
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: bcmath, curl, dom, fileinfo, gd, intl, mbstring, pdo_sqlite, redis, sqlite3, xml, zip
+          extensions: bcmath, curl, fileinfo, gd, intl, mbstring, pdo_sqlite, redis, sqlite3, xml, zip
           coverage: none
           tools: composer:v2
 
-      - name: Cache Composer downloads
-        uses: actions/cache@v5
-        with:
-          path: ~/.composer/cache/files
-          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
-          restore-keys: |
-            composer-${{ runner.os }}-
-
       - name: Install test dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
+        run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Prepare test environment
         run: |
@@ -53,10 +45,10 @@ jobs:
         run: php artisan test
 
   deploy:
-    name: Deploy to production FTP
+    name: Build and upload Laravel by FTP
     needs: ci
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     environment: production
     env:
       FTP_HOST: ${{ secrets.FTP_HOST }}
@@ -64,54 +56,70 @@ jobs:
       FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
       FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
       FTP_REMOTE_PATH: mybackend.free.nf/htdocs/
+      INFINITYFREE_ENV_FILE: ${{ secrets.INFINITYFREE_ENV_FILE }}
 
     steps:
-      - name: Check out tested prod commit
-        uses: actions/checkout@v6
+      - name: Checkout tested prod commit
+        uses: actions/checkout@v4
 
-      - name: Set up PHP 8.3
+      - name: Set up PHP 8.3 for production
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: bcmath, curl, dom, fileinfo, gd, intl, mbstring, mysqli, redis, xml, zip
+          extensions: bcmath, curl, fileinfo, gd, intl, mbstring, mysqli, redis, xml, zip
           coverage: none
           tools: composer:v2
 
       - name: Install production dependencies
-        run: composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
-      - name: Build deployment directory
-        run: |
-          mkdir -p deployment
-          rsync -a ./ deployment/ \
-            --exclude='.git/' \
-            --exclude='.github/' \
-            --exclude='.env' \
-            --exclude='.env.*' \
-            --exclude='deployment/' \
-            --exclude='node_modules/' \
-            --exclude='storage/logs/*.log' \
-            --exclude='tests/'
-
-      - name: Install FTP client
-        run: sudo apt-get update && sudo apt-get install -y lftp
-
-      - name: Upload only to the production site directory
+      - name: Prepare Laravel package for InfinityFree
         shell: bash
         run: |
           set -euo pipefail
 
-          : "${FTP_HOST:?Missing FTP_HOST GitHub secret}"
-          : "${FTP_USERNAME:?Missing FTP_USERNAME GitHub secret}"
-          : "${FTP_PASSWORD:?Missing FTP_PASSWORD GitHub secret}"
+          : "${INFINITYFREE_ENV_FILE:?Missing INFINITYFREE_ENV_FILE GitHub secret}"
 
-          lftp -u "${FTP_USERNAME},${FTP_PASSWORD}" -p "${FTP_PORT}" "${FTP_HOST}" <<LFTP
-          set cmd:fail-exit yes
-          set ftp:passive-mode true
-          set ftp:ssl-allow no
-          set net:max-retries 3
-          set net:timeout 30
-          cd ${FTP_REMOTE_PATH}
-          mirror --reverse --verbose --parallel=3 deployment/ ./
-          bye
-          LFTP
+          rm -rf deploy-build
+          mkdir -p deploy-build
+
+          rsync -a ./ deploy-build/ \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='deploy/' \
+            --exclude='deploy-build/' \
+            --exclude='node_modules/' \
+            --exclude='public/' \
+            --exclude='storage/logs/*.log' \
+            --exclude='tests/'
+
+          cp -a public/. deploy-build/
+          cp deploy/infinityfree/index.php deploy-build/index.php
+          cp deploy/infinityfree/.htaccess deploy-build/.htaccess
+
+          mkdir -p deploy-build/bootstrap/cache
+          mkdir -p deploy-build/storage/app/public
+          mkdir -p deploy-build/storage/framework/cache/data
+          mkdir -p deploy-build/storage/framework/sessions
+          mkdir -p deploy-build/storage/framework/views
+          mkdir -p deploy-build/storage/logs
+
+          printf '%s' "${INFINITYFREE_ENV_FILE}" > deploy-build/.env
+
+      - name: Upload only to mybackend production htdocs
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ env.FTP_HOST }}
+          username: ${{ env.FTP_USERNAME }}
+          password: ${{ env.FTP_PASSWORD }}
+          port: ${{ env.FTP_PORT }}
+          protocol: ftp
+          local-dir: ./deploy-build/
+          server-dir: ${{ env.FTP_REMOTE_PATH }}
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
