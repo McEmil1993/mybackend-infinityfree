@@ -1,6 +1,6 @@
 # Laravel REST API
 
-JSON-only REST API built with Laravel 13, PHP 8.3, SQLite, and Laravel Sanctum.
+JSON-only REST API built with Laravel 13, PHP 8.3, MySQL, and Laravel Sanctum.
 It provides user registration, login, logout, authenticated user listing, profile
 lookup, and password changes. There are no web pages: visiting `/` returns a JSON
 `404 Not Found` response.
@@ -13,7 +13,7 @@ lookup, and password changes. There are no web pages: visiting `/` returns a JSO
 - Protected user list and current-user profile
 - Password change with current-password verification
 - Logout and token revocation
-- SQLite database by default
+- MySQL database
 - Docker development environment on `http://localhost:9001`
 - Automated feature tests
 - VS Code REST Client request collection
@@ -29,8 +29,11 @@ The local PHP extensions used by this project include:
 
 ```text
 bcmath, curl, fileinfo, gd, intl, mbstring, mysqli, openssl,
-pdo_sqlite, redis, sqlite3, xml, zip
+pdo_mysql, redis, xml, zip
 ```
+
+The Docker image also includes SQLite only for isolated in-memory automated tests.
+The running application uses MySQL.
 
 Node.js is not required to run this API.
 
@@ -77,11 +80,23 @@ docker compose run --rm -w /data/mybackend ubuntu sh -c "cp .env.example .env"
 docker compose run --rm -w /data/mybackend ubuntu php artisan key:generate
 ```
 
-### 5. Create the SQLite file
+### 5. Configure MySQL
 
-```bash
-docker compose run --rm -w /data/mybackend ubuntu php -r "file_exists('database/database.sqlite') || touch('database/database.sqlite');"
+Create an empty MySQL database, then configure `data/mybackend/.env`:
+
+```dotenv
+DB_CONNECTION=mysql
+DB_HOST=YOUR_MYSQL_HOST
+DB_PORT=3306
+DB_DATABASE=laravel_api
+DB_USERNAME=YOUR_MYSQL_USER
+DB_PASSWORD=YOUR_MYSQL_PASSWORD
 ```
+
+When MySQL runs on the host machine, `127.0.0.1` inside the container points to
+the container itself. Use a host address reachable from Docker, such as
+`host.docker.internal` on Docker Desktop, or the appropriate host/gateway IP on
+Linux. If MySQL is remote, use its server IP address or hostname.
 
 ### 6. Run the database migrations
 
@@ -131,7 +146,7 @@ official repositories.
 sudo apt-get update
 sudo apt-get install -y \
   php8.3-cli php8.3-bcmath php8.3-curl php8.3-gd php8.3-intl \
-  php8.3-mbstring php8.3-mysql php8.3-redis php8.3-sqlite3 \
+  php8.3-mbstring php8.3-mysql php8.3-redis \
   php8.3-xml php8.3-zip curl unzip
 ```
 
@@ -151,11 +166,15 @@ cd data/mybackend
 composer install
 cp .env.example .env
 php artisan key:generate
-touch database/database.sqlite
+```
+
+Create a MySQL database and update the `DB_*` values in `.env`, then run:
+
+```bash
 php artisan migrate
 ```
 
-If `.env` or `database/database.sqlite` already exists, do not overwrite it.
+If `.env` already exists, do not overwrite it.
 
 ### 3. Start the local server
 
@@ -186,8 +205,7 @@ extension=intl
 extension=mbstring
 extension=mysqli
 extension=openssl
-extension=pdo_sqlite
-extension=sqlite3
+extension=pdo_mysql
 extension=zip
 ```
 
@@ -208,11 +226,11 @@ Set-Location data\mybackend
 composer install
 Copy-Item .env.example .env
 php artisan key:generate
+```
 
-if (-not (Test-Path database\database.sqlite)) {
-    New-Item -ItemType File database\database.sqlite
-}
+Create a MySQL database and update the `DB_*` settings in `.env`, then run:
 
+```powershell
 php artisan migrate
 ```
 
@@ -350,9 +368,15 @@ php artisan route:list
 
 ## Troubleshooting
 
-### `could not find driver` for SQLite
+### `could not find driver` for MySQL
 
-Enable or install `pdo_sqlite` and `sqlite3`, then restart the PHP process.
+Enable or install `pdo_mysql` / `php8.3-mysql`, then restart the PHP process.
+
+### `Connection refused` or MySQL connection timeout
+
+Check `DB_HOST`, `DB_PORT`, firewall rules, and whether MySQL accepts connections
+from the Docker container or local machine. Inside Docker, do not use `127.0.0.1`
+for a MySQL server running directly on the host.
 
 ### `No application encryption key has been specified`
 
