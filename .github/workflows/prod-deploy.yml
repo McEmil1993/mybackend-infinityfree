@@ -16,7 +16,8 @@ jobs:
   deploy:
     name: Build and upload Laravel by FTP
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # The first deployment uploads thousands of Composer vendor files over FTP.
+    timeout-minutes: 180
     environment: production
     env:
       FTP_HOST: ${{ secrets.FTP_HOST }}
@@ -77,7 +78,7 @@ jobs:
           printf '%s' "${INFINITYFREE_ENV_FILE}" > deploy-build/.env
 
       - name: Upload only to mybackend production htdocs
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ env.FTP_HOST }}
           username: ${{ env.FTP_USERNAME }}
@@ -87,6 +88,8 @@ jobs:
           local-dir: ./deploy-build/
           server-dir: ${{ env.FTP_REMOTE_PATH }}
           dangerous-clean-slate: false
+          timeout: 120000
+          log-level: minimal
           exclude: |
             **/.git*
             **/.git*/**
