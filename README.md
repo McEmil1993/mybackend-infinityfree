@@ -260,17 +260,17 @@ Do not place tokens in a URL or commit real tokens to source control.
 
 | Method | Endpoint | Authentication | Description |
 | --- | --- | --- | --- |
-| `POST` | `/register` | Public | Register a user and return a token |
-| `POST` | `/login` | Public | Log in and return a token |
-| `GET` | `/users` | Bearer token | List all users |
-| `GET` | `/me` | Bearer token | Return the authenticated user |
-| `PUT` | `/change-password` | Bearer token | Change the authenticated user's password |
-| `POST` | `/logout` | Bearer token | Revoke the current token |
+| `POST` | `/api/register` | Public | Register a user and return a token |
+| `POST` | `/api/login` | Public | Log in and return a token |
+| `GET` | `/api/users` | Bearer token | List all users |
+| `GET` | `/api/me` | Bearer token | Return the authenticated user |
+| `PUT` | `/api/change-password` | Bearer token | Change the authenticated user's password |
+| `POST` | `/api/logout` | Bearer token | Revoke the current token |
 
 ### Register
 
 ```http
-POST /register
+POST /api/register
 Content-Type: application/json
 Accept: application/json
 ```
