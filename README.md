@@ -355,6 +355,59 @@ Check the registered routes with:
 php artisan route:list
 ```
 
+## GitHub CI/CD Deployment
+
+The workflow at `.github/workflows/prod-deploy.yml` runs only when a commit is
+pushed to the `prod` branch. Merging a pull request into `prod` creates a push,
+so it also starts the workflow. Pushes and merges to `main` do not deploy.
+
+The pipeline performs these steps in order:
+
+1. Install PHP 8.3 and Composer dependencies.
+2. Run Laravel Pint and the automated tests.
+3. Stop immediately if CI fails.
+4. Install optimized production dependencies without development packages.
+5. Upload the application only to `mybackend.free.nf/htdocs/` over FTP.
+
+The FTP sync does not delete remote files. It also excludes `.env`, tests, Git
+metadata, GitHub workflow files, and local logs. Create and maintain the
+production `.env` directly on the server; the workflow will not overwrite it.
+
+### Required GitHub Secrets
+
+In the GitHub repository, open **Settings > Secrets and variables > Actions** and
+create these repository or `production` environment secrets:
+
+| Secret | Value |
+| --- | --- |
+| `FTP_HOST` | FTP server hostname |
+| `FTP_USERNAME` | FTP account username |
+| `FTP_PASSWORD` | FTP account password |
+
+Do not place FTP credentials in the workflow, `.env.example`, or repository.
+Because FTP is unencrypted, use FTPS or SFTP instead when the hosting provider
+supports it.
+
+### Production Branch Flow
+
+Create and push the production branch once if it does not exist:
+
+```bash
+git switch -c prod
+git push -u origin prod
+```
+
+For later releases, merge reviewed changes into `prod` and push:
+
+```bash
+git switch prod
+git merge main
+git push origin prod
+```
+
+Monitor the run from the repository's **Actions** tab. GitHub's `production`
+environment can optionally require owner approval before the deploy job starts.
+
 ## Configuration and Security
 
 - Keep `APP_DEBUG=false` when responses may be seen by other users. This prevents

@@ -1,0 +1,117 @@
+name: Production CI/CD
+
+on:
+  push:
+    branches:
+      - prod
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Test application
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out prod commit
+        uses: actions/checkout@v6
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, curl, dom, fileinfo, gd, intl, mbstring, pdo_sqlite, redis, sqlite3, xml, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer downloads
+        uses: actions/cache@v5
+        with:
+          path: ~/.composer/cache/files
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-
+
+      - name: Install test dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare test environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Check code style
+        run: vendor/bin/pint --test
+
+      - name: Run automated tests
+        run: php artisan test
+
+  deploy:
+    name: Deploy to production FTP
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    env:
+      FTP_HOST: ${{ secrets.FTP_HOST }}
+      FTP_PORT: '21'
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_REMOTE_PATH: mybackend.free.nf/htdocs/
+
+    steps:
+      - name: Check out tested prod commit
+        uses: actions/checkout@v6
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, curl, dom, fileinfo, gd, intl, mbstring, mysqli, redis, xml, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Install production dependencies
+        run: composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
+
+      - name: Build deployment directory
+        run: |
+          mkdir -p deployment
+          rsync -a ./ deployment/ \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='deployment/' \
+            --exclude='node_modules/' \
+            --exclude='storage/logs/*.log' \
+            --exclude='tests/'
+
+      - name: Install FTP client
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Upload only to the production site directory
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          : "${FTP_HOST:?Missing FTP_HOST GitHub secret}"
+          : "${FTP_USERNAME:?Missing FTP_USERNAME GitHub secret}"
+          : "${FTP_PASSWORD:?Missing FTP_PASSWORD GitHub secret}"
+
+          lftp -u "${FTP_USERNAME},${FTP_PASSWORD}" -p "${FTP_PORT}" "${FTP_HOST}" <<LFTP
+          set cmd:fail-exit yes
+          set ftp:passive-mode true
+          set ftp:ssl-allow no
+          set net:max-retries 3
+          set net:timeout 30
+          cd ${FTP_REMOTE_PATH}
+          mirror --reverse --verbose --parallel=3 deployment/ ./
+          bye
+          LFTP
